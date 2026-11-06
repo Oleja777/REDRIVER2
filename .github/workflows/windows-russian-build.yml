@@ -1,0 +1,54 @@
+name: Windows Russian build
+
+on:
+  push:
+    branches:
+      - ci/russian-build
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download build dependencies
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'src_rebuild'
+          $deps = Join-Path $source 'dependencies'
+          New-Item -ItemType Directory -Force -Path $deps | Out-Null
+
+          Invoke-WebRequest 'https://github.com/premake/premake-core/releases/download/v5.0.0-beta1/premake-5.0.0-beta1-windows.zip' -OutFile premake.zip
+          Expand-Archive premake.zip -DestinationPath $source
+
+          Invoke-WebRequest 'https://github.com/libsdl-org/SDL/releases/download/release-2.30.2/SDL2-devel-2.30.2-VC.zip' -OutFile sdl.zip
+          Expand-Archive sdl.zip -DestinationPath $deps
+
+          Invoke-WebRequest 'https://github.com/kcat/openal-soft/releases/download/1.23.1/openal-soft-1.23.1-bin.zip' -OutFile openal.zip
+          Expand-Archive openal.zip -DestinationPath $deps
+
+          Invoke-WebRequest 'https://www.ijg.org/files/jpegsr9d.zip' -OutFile jpeg.zip
+          Expand-Archive jpeg.zip -DestinationPath $deps
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE 'src_rebuild'
+          $deps = Join-Path $source 'dependencies'
+          $env:SDL2_DIR = Join-Path $deps 'SDL2-2.30.2'
+          $env:OPENAL_DIR = Join-Path $deps 'openal-soft-1.23.1-bin'
+          $env:JPEG_DIR = Join-Path $deps 'jpeg-9d'
+          Rename-Item (Join-Path $env:JPEG_DIR 'jconfig.vc') 'jconfig.h'
+          Push-Location $source
+          & .\premake5.exe vs2022
+          Pop-Location
+          msbuild (Join-Path $source 'build\REDRIVER2.sln') /p:Configuration=Release /p:Platform=Win32 /m /nologo
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: REDRIVER2-Russian-Windows
+          path: src_rebuild/bin/Release/REDRIVER2.exe
+          if-no-files-found: error

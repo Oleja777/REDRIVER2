@@ -13,6 +13,8 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: microsoft/setup-msbuild@v2
+
       - name: Download build dependencies
         shell: pwsh
         run: |
